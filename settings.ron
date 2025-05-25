@@ -1,0 +1,7 @@
+(
+    audio_settings: (
+        master_volume: 0.3,
+        music_volume: 0.000000014901161,
+        ui_volume: 0.3,
+    ),
+)
