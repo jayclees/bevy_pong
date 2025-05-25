@@ -36,7 +36,7 @@ concurrency:
 env:
   # TODO: Workaround for <https://github.com/rust-lang/cargo/issues/6790>.
   # The base filename of the binary produced by `cargo build`.
-  cargo_build_binary_name: pre_jam_practice
+  cargo_build_binary_name: bevy_pong
 
   # The path to the assets directory.
   assets_path: assets
@@ -46,7 +46,7 @@ env:
 
   # The itch.io project to upload to in the format `user-name/project-name`.
   # There will be no upload to itch.io if this is commented out.
-  #upload_to_itch: your-itch-username/pre_jam_practice
+  upload_to_itch: jayclees/bevy_pong
 
   ############
   # ADVANCED #
