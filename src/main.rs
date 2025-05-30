@@ -12,8 +12,15 @@ mod theme;
 mod util;
 
 use crate::prelude::*;
+use avian2d::math::Vector;
 
 pub fn plugin(app: &mut App) {
+    app
+        .insert_resource(DefaultFriction(Friction::new(0.)))
+        .insert_resource(DefaultRestitution(
+            Restitution::new(1.),
+        ));
+
     // Add core plugins.
     app.add_plugins(core::plugin);
 
@@ -64,10 +71,11 @@ fn setup(mut commands: Commands) {
         Player {},
         Player1 {},
         Name::new("Player1"),
-        RigidBody::Static,
         Collider::rectangle(width, height),
-        Transform::from_xyz(-400.0, 0.0, 0.0),
+        Transform::from_xyz(-100.0, 0.0, 0.0),
+        RigidBody::Dynamic,
         LinearVelocity::default(),
+        LockedAxes::ALL_LOCKED.unlock_translation_y(),
         Sprite::from_color(
             Srgba::from_vec3(Vec3::splat(0.5)),
             Vec2 {
@@ -75,15 +83,28 @@ fn setup(mut commands: Commands) {
                 y: height,
             },
         ),
+        Restitution {
+            coefficient: 1.0,
+            combine_rule: CoefficientCombine::Max,
+        },
+        Friction {
+            dynamic_coefficient: 0.0,
+            static_coefficient: 0.0,
+            combine_rule: CoefficientCombine::Max,
+        },
+        LinearDamping(0.0),
+        AngularDamping(0.0),
+        GravityScale(0.0)
     ));
     commands.spawn((
         Player {},
         Player2 {},
         Name::new("Player2"),
-        RigidBody::Static,
         Collider::rectangle(width, height),
-        Transform::from_xyz(400.0, 0.0, 0.0),
+        Transform::from_xyz(100.0, 0.0, 0.0),
+        RigidBody::Dynamic,
         LinearVelocity::default(),
+        LockedAxes::ALL_LOCKED.unlock_translation_y(),
         Sprite::from_color(
             Srgba::from_vec3(Vec3::splat(0.5)),
             Vec2 {
@@ -91,14 +112,39 @@ fn setup(mut commands: Commands) {
                 y: height,
             },
         ),
+        Restitution {
+            coefficient: 1.0,
+            combine_rule: CoefficientCombine::Max,
+        },
+        Friction {
+            dynamic_coefficient: 0.0,
+            static_coefficient: 0.0,
+            combine_rule: CoefficientCombine::Max,
+        },
+        LinearDamping(0.0),
+        AngularDamping(0.0),
+        GravityScale(0.0)
     ));
     commands.spawn((
         Name::new("Ball"),
         RigidBody::Dynamic,
-        Collider::circle(width),
-        // LinearVelocity::default(),
+        Collider::circle(width / 2.0),
+        LinearVelocity(Vector::new(1000.0, 0.0)),
         Sprite::from_color(Srgba::from_vec3(Vec3::splat(0.5)), Vec2::splat(width)),
-        Ball {}
+        Ball {},
+        LockedAxes::ROTATION_LOCKED,
+        Restitution {
+            coefficient: 1.0,
+            combine_rule: CoefficientCombine::Max,
+        },
+        Friction {
+            dynamic_coefficient: 0.0,
+            static_coefficient: 0.0,
+            combine_rule: CoefficientCombine::Max,
+        },
+        LinearDamping(0.0),
+        AngularDamping(0.0),
+        GravityScale(0.0)
     ));
 }
 
@@ -109,28 +155,25 @@ fn move_players(
     player2_id: Single<Entity, With<Player2>>,
     time: Res<Time>,
 ) {
-    let speed = time.delta_secs() * 60.0 * 60.0;
+    let speed = time.delta_secs() * 5000.0;
 
     let mut p1_speed = 0.0;
     p1_speed += if keys.pressed(KeyCode::KeyW) { speed } else { 0.0 };
     p1_speed += if keys.pressed(KeyCode::KeyS) { -speed } else { 0.0 };
     println!("{p1_speed}");
     let mut velocity = r!(transform_query.get_mut(*player1_id));
-    velocity.x += p1_speed;
+    velocity.y = p1_speed;
 
     let mut p2_speed = 0.0;
-    p2_speed += if keys.pressed(KeyCode::KeyW) { speed } else { 0.0 };
-    p2_speed += if keys.pressed(KeyCode::KeyS) { -speed } else { 0.0 };
+    p2_speed += if keys.pressed(KeyCode::ArrowUp) { speed } else { 0.0 };
+    p2_speed += if keys.pressed(KeyCode::ArrowDown) { -speed } else { 0.0 };
     println!("{p2_speed}");
     let mut velocity = r!(transform_query.get_mut(*player2_id));
-    velocity.x += p2_speed;
+    velocity.y = p2_speed;
 }
 
-// fn move_ball(
-//     time: Res<Time>,
-//     transform_query: Query<&Ball>,
-// ) {
-//
+// fn move_ball(time: Res<Time>, transform_query: Query<&Ball>) {
+// 
 // }
 
 // TODO: Workaround for <https://github.com/DioxusLabs/dioxus/issues/4160>.
