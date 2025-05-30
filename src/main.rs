@@ -54,6 +54,9 @@ struct Player1;
 #[derive(Component)]
 struct Player2;
 
+#[derive(Component)]
+struct Ball;
+
 fn setup(mut commands: Commands) {
     let width = 20.0;
     let height = 200.0;
@@ -64,6 +67,7 @@ fn setup(mut commands: Commands) {
         RigidBody::Static,
         Collider::rectangle(width, height),
         Transform::from_xyz(-400.0, 0.0, 0.0),
+        LinearVelocity::default(),
         Sprite::from_color(
             Srgba::from_vec3(Vec3::splat(0.5)),
             Vec2 {
@@ -79,6 +83,7 @@ fn setup(mut commands: Commands) {
         RigidBody::Static,
         Collider::rectangle(width, height),
         Transform::from_xyz(400.0, 0.0, 0.0),
+        LinearVelocity::default(),
         Sprite::from_color(
             Srgba::from_vec3(Vec3::splat(0.5)),
             Vec2 {
@@ -91,30 +96,42 @@ fn setup(mut commands: Commands) {
         Name::new("Ball"),
         RigidBody::Dynamic,
         Collider::circle(width),
-        Transform::from_xyz(0.0, 0.0, 0.0),
+        // LinearVelocity::default(),
         Sprite::from_color(Srgba::from_vec3(Vec3::splat(0.5)), Vec2::splat(width)),
+        Ball {}
     ));
 }
 
 fn move_players(
     keys: Res<ButtonInput<KeyCode>>,
-    mut transform_query: Query<&mut Transform, With<Player>>,
+    mut transform_query: Query<&mut LinearVelocity, With<Player>>,
     player1_id: Single<Entity, With<Player1>>,
     player2_id: Single<Entity, With<Player2>>,
     time: Res<Time>,
 ) {
-    let speed = time.delta().as_secs_f32() * 60.0 * 6.0;
+    let speed = time.delta_secs() * 60.0 * 60.0;
 
-    let mut player1_speed = 0.0;
-    player1_speed += if keys.pressed(KeyCode::KeyW) { speed } else { 0.0 };
-    player1_speed += if keys.pressed(KeyCode::KeyS) { -speed } else { 0.0 };
-    r!(transform_query.get_mut(*player1_id)).translation.y += player1_speed;
+    let mut p1_speed = 0.0;
+    p1_speed += if keys.pressed(KeyCode::KeyW) { speed } else { 0.0 };
+    p1_speed += if keys.pressed(KeyCode::KeyS) { -speed } else { 0.0 };
+    println!("{p1_speed}");
+    let mut velocity = r!(transform_query.get_mut(*player1_id));
+    velocity.x += p1_speed;
 
-    let mut player2_speed = 0.0;
-    player2_speed += if keys.pressed(KeyCode::ArrowUp) { speed } else { 0.0 };
-    player2_speed += if keys.pressed(KeyCode::ArrowDown) { -speed } else { 0.0 };
-    r!(transform_query.get_mut(*player2_id)).translation.y += player2_speed;
+    let mut p2_speed = 0.0;
+    p2_speed += if keys.pressed(KeyCode::KeyW) { speed } else { 0.0 };
+    p2_speed += if keys.pressed(KeyCode::KeyS) { -speed } else { 0.0 };
+    println!("{p2_speed}");
+    let mut velocity = r!(transform_query.get_mut(*player2_id));
+    velocity.x += p2_speed;
 }
+
+// fn move_ball(
+//     time: Res<Time>,
+//     transform_query: Query<&Ball>,
+// ) {
+//
+// }
 
 // TODO: Workaround for <https://github.com/DioxusLabs/dioxus/issues/4160>.
 #[cfg(feature = "bevy_mod_debugdump")]
