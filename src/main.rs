@@ -11,8 +11,11 @@ mod screen;
 mod theme;
 mod util;
 
+use std::ops::Deref;
 use crate::prelude::*;
 use avian2d::math::Vector;
+use avian2d::parry::shape::SharedShape;
+use bevy::window::PrimaryWindow;
 
 pub fn plugin(app: &mut App) {
     app
@@ -35,6 +38,7 @@ pub fn plugin(app: &mut App) {
 
     app.add_systems(Startup, setup);
     app.add_systems(Update, move_players);
+    // app.add_systems(Update, contain_ball);
 }
 
 fn main() -> AppExit {
@@ -64,16 +68,19 @@ struct Player2;
 #[derive(Component)]
 struct Ball;
 
-fn setup(mut commands: Commands) {
-    let width = 20.0;
-    let height = 200.0;
+fn setup(
+    mut commands: Commands,
+    window_query: Single<(&Window, &PrimaryWindow)>,
+) {
+    let width = 20.;
+    let height = 200.;
     commands.spawn((
         Player {},
         Player1 {},
         Name::new("Player1"),
         Collider::rectangle(width, height),
-        Transform::from_xyz(-100.0, 0.0, 0.0),
-        RigidBody::Dynamic,
+        Transform::from_xyz(-400., 0., 0.),
+        RigidBody::Kinematic,
         LinearVelocity::default(),
         LockedAxes::ALL_LOCKED.unlock_translation_y(),
         Sprite::from_color(
@@ -83,26 +90,14 @@ fn setup(mut commands: Commands) {
                 y: height,
             },
         ),
-        Restitution {
-            coefficient: 1.0,
-            combine_rule: CoefficientCombine::Max,
-        },
-        Friction {
-            dynamic_coefficient: 0.0,
-            static_coefficient: 0.0,
-            combine_rule: CoefficientCombine::Max,
-        },
-        LinearDamping(0.0),
-        AngularDamping(0.0),
-        GravityScale(0.0)
     ));
     commands.spawn((
         Player {},
         Player2 {},
         Name::new("Player2"),
         Collider::rectangle(width, height),
-        Transform::from_xyz(100.0, 0.0, 0.0),
-        RigidBody::Dynamic,
+        Transform::from_xyz(400., 0., 0.),
+        RigidBody::Kinematic,
         LinearVelocity::default(),
         LockedAxes::ALL_LOCKED.unlock_translation_y(),
         Sprite::from_color(
@@ -112,68 +107,120 @@ fn setup(mut commands: Commands) {
                 y: height,
             },
         ),
-        Restitution {
-            coefficient: 1.0,
-            combine_rule: CoefficientCombine::Max,
-        },
-        Friction {
-            dynamic_coefficient: 0.0,
-            static_coefficient: 0.0,
-            combine_rule: CoefficientCombine::Max,
-        },
-        LinearDamping(0.0),
-        AngularDamping(0.0),
-        GravityScale(0.0)
     ));
+
+    // let n: f32 = random();
+    let n: f32 = 0.1;
+    let direction = if n < 0.25 {
+        Vector::new(-200., -150.)
+    } else if n < 0.5 {
+        Vector::new(-200., 150.)
+    } else if n < 0.75 {
+        Vector::new(200., -150.)
+    } else {
+        Vector::new(200., 150.)
+    };
+
     commands.spawn((
         Name::new("Ball"),
         RigidBody::Dynamic,
-        Collider::circle(width / 2.0),
-        LinearVelocity(Vector::new(1000.0, 0.0)),
+        Collider::circle(width / 2.),
+        LinearVelocity(direction),
         Sprite::from_color(Srgba::from_vec3(Vec3::splat(0.5)), Vec2::splat(width)),
         Ball {},
-        LockedAxes::ROTATION_LOCKED,
-        Restitution {
-            coefficient: 1.0,
-            combine_rule: CoefficientCombine::Max,
-        },
-        Friction {
-            dynamic_coefficient: 0.0,
-            static_coefficient: 0.0,
-            combine_rule: CoefficientCombine::Max,
-        },
-        LinearDamping(0.0),
-        AngularDamping(0.0),
-        GravityScale(0.0)
+    ));
+
+    let boundary_width = 20.;
+    let window_height = window_query.deref().0.height();
+    let window_width = window_query.deref().0.width();
+    let x_start = window_width / 2.;
+    let y_start = window_height / 2.;
+
+    commands.spawn((
+        Name::new("BoundaryStartY"),
+        RigidBody::Static,
+        Collider::rectangle(window_width, boundary_width),
+        Transform::from_xyz(0., y_start + (boundary_width * 0.5), 0.),
+        Sprite::from_color(
+            Srgba::from_vec3(Vec3::new(0.5, 0.25, 0.25)),
+            Vec2 {
+                x: window_width,
+                y: boundary_width,
+            },
+        ),
+    ));
+    commands.spawn((
+        Name::new("BoundaryEndY"),
+        RigidBody::Static,
+        Collider::rectangle(window_width, boundary_width),
+        Transform::from_xyz(0., -y_start - (boundary_width * 0.5), 0.),
+        Sprite::from_color(
+            Srgba::from_vec3(Vec3::new(0.5, 0.25, 0.25)),
+            Vec2 {
+                x: window_width,
+                y: boundary_width,
+            },
+        ),
+    ));
+    commands.spawn((
+        Name::new("BoundaryStartX"),
+        RigidBody::Static,
+        Collider::rectangle(boundary_width, window_height),
+        Transform::from_xyz(-x_start - (boundary_width * 0.5), 0., 0.),
+        Sprite::from_color(
+            Srgba::from_vec3(Vec3::new(0.5, 0.25, 0.25)),
+            Vec2 {
+                x: boundary_width,
+                y: window_height,
+            },
+        ),
+    ));
+    commands.spawn((
+        Name::new("BoundaryEndX"),
+        RigidBody::Static,
+        Collider::rectangle(boundary_width, window_height),
+        Transform::from_xyz(x_start + (boundary_width * 0.5), 0., 0.),
+        Sprite::from_color(
+            Srgba::from_vec3(Vec3::new(0.5, 0.25, 0.25)),
+            Vec2 {
+                x: boundary_width,
+                y: window_height,
+            },
+        ),
     ));
 }
 
 fn move_players(
     keys: Res<ButtonInput<KeyCode>>,
-    mut transform_query: Query<&mut LinearVelocity, With<Player>>,
+    mut velocity_query: Query<&mut LinearVelocity, With<Player>>,
     player1_id: Single<Entity, With<Player1>>,
     player2_id: Single<Entity, With<Player2>>,
     time: Res<Time>,
 ) {
-    let speed = time.delta_secs() * 5000.0;
+    let speed = time.delta_secs() * 25000.;
 
-    let mut p1_speed = 0.0;
-    p1_speed += if keys.pressed(KeyCode::KeyW) { speed } else { 0.0 };
-    p1_speed += if keys.pressed(KeyCode::KeyS) { -speed } else { 0.0 };
-    println!("{p1_speed}");
-    let mut velocity = r!(transform_query.get_mut(*player1_id));
-    velocity.y = p1_speed;
+    let mut p1_speed = 0.;
+    p1_speed += if keys.pressed(KeyCode::KeyW) { speed } else { 0. };
+    p1_speed += if keys.pressed(KeyCode::KeyS) { -speed } else { 0. };
+    r!(velocity_query.get_mut(*player1_id)).y = p1_speed;
 
-    let mut p2_speed = 0.0;
-    p2_speed += if keys.pressed(KeyCode::ArrowUp) { speed } else { 0.0 };
-    p2_speed += if keys.pressed(KeyCode::ArrowDown) { -speed } else { 0.0 };
-    println!("{p2_speed}");
-    let mut velocity = r!(transform_query.get_mut(*player2_id));
-    velocity.y = p2_speed;
+    let mut p2_speed = 0.;
+    p2_speed += if keys.pressed(KeyCode::ArrowUp) { speed } else { 0. };
+    p2_speed += if keys.pressed(KeyCode::ArrowDown) { -speed } else { 0. };
+    r!(velocity_query.get_mut(*player2_id)).y = p2_speed;
 }
 
-// fn move_ball(time: Res<Time>, transform_query: Query<&Ball>) {
-// 
+// fn contain_ball(
+//     mut query: Query<(&mut LinearVelocity, &Transform, &Collider), With<Ball>>,
+//     window_query: Single<(&Window, &PrimaryWindow)>
+// ) {
+//     let window_height = window_query.deref().0.height();
+//     let (mut linear_velocity, transform, collider) = r!(query.single_mut());
+//
+//     let SharedShape(x) = collider.shape();
+//     if transform.translation.y.abs() > window_height / 2. - x.as_ball().unwrap().radius {
+//         linear_velocity.y *= -1.;
+//     }
 // }
 
 // TODO: Workaround for <https://github.com/DioxusLabs/dioxus/issues/4160>.
