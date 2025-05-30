@@ -14,11 +14,28 @@ mod util;
 use std::ops::Deref;
 use crate::prelude::*;
 use avian2d::math::Vector;
-use avian2d::parry::shape::SharedShape;
 use bevy::window::PrimaryWindow;
+use crate::menu::Menu;
+use crate::screen::Screen;
+
+#[derive(Resource, Debug)]
+struct Score {
+    pub player1: u32,
+    pub player2: u32,
+}
+
+impl Score {
+    fn new() -> Self {
+        Score {
+            player1: 0,
+            player2: 0,
+        }
+    }
+}
 
 pub fn plugin(app: &mut App) {
     app
+        .insert_resource(Score::new())
         .insert_resource(DefaultFriction(Friction::new(0.)))
         .insert_resource(DefaultRestitution(
             Restitution::new(1.),
@@ -36,9 +53,16 @@ pub fn plugin(app: &mut App) {
         util::plugin,
     ));
 
-    app.add_systems(Startup, setup);
-    app.add_systems(Update, move_players);
-    // app.add_systems(Update, contain_ball);
+    app.add_systems(StateFlush, Screen::Gameplay.on_enter((
+        add_score,
+        add_players,
+        add_ball,
+        add_boundaries,
+    )));
+    app.add_systems(Update, Screen::Gameplay.on_update((
+        move_players,
+        update_score,
+    )));
 }
 
 fn main() -> AppExit {
@@ -57,6 +81,9 @@ fn run() -> AppExit {
 }
 
 #[derive(Component)]
+struct ScoreBoard;
+
+#[derive(Component)]
 struct Player;
 
 #[derive(Component)]
@@ -68,10 +95,24 @@ struct Player2;
 #[derive(Component)]
 struct Ball;
 
-fn setup(
+#[derive(Component)]
+struct BoundaryXStart;
+
+#[derive(Component)]
+struct BoundaryXEnd;
+
+fn add_score(
     mut commands: Commands,
-    window_query: Single<(&Window, &PrimaryWindow)>,
+    score_resource: Res<Score>
 ) {
+    commands.spawn((
+        ScoreBoard {},
+        Text(format!("{} - {}", score_resource.player1, score_resource.player2)),
+        DespawnOnExitState::<Screen>::Recursive,
+    ));
+}
+
+fn add_players(mut commands: Commands) {
     let width = 20.;
     let height = 200.;
     commands.spawn((
@@ -90,6 +131,7 @@ fn setup(
                 y: height,
             },
         ),
+        DespawnOnExitState::<Screen>::Recursive,
     ));
     commands.spawn((
         Player {},
@@ -107,10 +149,12 @@ fn setup(
                 y: height,
             },
         ),
+        DespawnOnExitState::<Screen>::Recursive,
     ));
+}
 
-    // let n: f32 = random();
-    let n: f32 = 0.1;
+fn add_ball(mut commands: Commands) {
+    let n: f32 = random();
     let direction = if n < 0.25 {
         Vector::new(-200., -150.)
     } else if n < 0.5 {
@@ -121,15 +165,22 @@ fn setup(
         Vector::new(200., 150.)
     };
 
+    let width = 10.;
     commands.spawn((
         Name::new("Ball"),
         RigidBody::Dynamic,
-        Collider::circle(width / 2.),
+        Collider::circle(width),
         LinearVelocity(direction),
-        Sprite::from_color(Srgba::from_vec3(Vec3::splat(0.5)), Vec2::splat(width)),
+        Sprite::from_color(Srgba::from_vec3(Vec3::splat(0.5)), Vec2::splat(width * 2.)),
         Ball {},
+        DespawnOnExitState::<Screen>::Recursive,
     ));
+}
 
+fn add_boundaries(
+    mut commands: Commands,
+    window_query: Single<(&Window, &PrimaryWindow)>,
+) {
     let boundary_width = 20.;
     let window_height = window_query.deref().0.height();
     let window_width = window_query.deref().0.width();
@@ -137,7 +188,7 @@ fn setup(
     let y_start = window_height / 2.;
 
     commands.spawn((
-        Name::new("BoundaryStartY"),
+        Name::new("BoundaryYStart"),
         RigidBody::Static,
         Collider::rectangle(window_width, boundary_width),
         Transform::from_xyz(0., y_start + (boundary_width * 0.5), 0.),
@@ -148,9 +199,10 @@ fn setup(
                 y: boundary_width,
             },
         ),
+        DespawnOnExitState::<Screen>::Recursive,
     ));
     commands.spawn((
-        Name::new("BoundaryEndY"),
+        Name::new("BoundaryYEnd"),
         RigidBody::Static,
         Collider::rectangle(window_width, boundary_width),
         Transform::from_xyz(0., -y_start - (boundary_width * 0.5), 0.),
@@ -161,9 +213,11 @@ fn setup(
                 y: boundary_width,
             },
         ),
+        DespawnOnExitState::<Screen>::Recursive,
     ));
     commands.spawn((
-        Name::new("BoundaryStartX"),
+        Name::new("BoundaryXStart"),
+        BoundaryXStart,
         RigidBody::Static,
         Collider::rectangle(boundary_width, window_height),
         Transform::from_xyz(-x_start - (boundary_width * 0.5), 0., 0.),
@@ -174,9 +228,26 @@ fn setup(
                 y: window_height,
             },
         ),
-    ));
+        CollisionEventsEnabled,
+        DespawnOnExitState::<Screen>::Recursive,
+    )).observe(|
+        trigger: Trigger<OnCollisionStart>,
+        mut query: Query<(&Ball, &mut Transform)>,
+        score_resource: ResMut<Score>
+    | {
+        if query.contains(trigger.collider) {
+            println!("Ball hit BoundaryXStart");
+
+            let score = score_resource.into_inner();
+            score.player2 += 1;
+
+            let mut transform = r!(query.single_mut()).1;
+            transform.translation = Vec3::splat(0.);
+        }
+    });
     commands.spawn((
-        Name::new("BoundaryEndX"),
+        Name::new("BoundaryXEnd"),
+        BoundaryXEnd,
         RigidBody::Static,
         Collider::rectangle(boundary_width, window_height),
         Transform::from_xyz(x_start + (boundary_width * 0.5), 0., 0.),
@@ -187,7 +258,23 @@ fn setup(
                 y: window_height,
             },
         ),
-    ));
+        CollisionEventsEnabled,
+        DespawnOnExitState::<Screen>::Recursive,
+    )).observe(|
+        trigger: Trigger<OnCollisionStart>,
+        mut query: Query<(&Ball, &mut Transform)>,
+        score_resource: ResMut<Score>
+    | {
+        if query.contains(trigger.collider) {
+            println!("Ball hit BoundaryXEnd");
+
+            let score = score_resource.into_inner();
+            score.player1 += 1;
+
+            let mut transform = r!(query.single_mut()).1;
+            transform.translation = Vec3::splat(0.);
+        }
+    });
 }
 
 fn move_players(
@@ -208,6 +295,15 @@ fn move_players(
     p2_speed += if keys.pressed(KeyCode::ArrowUp) { speed } else { 0. };
     p2_speed += if keys.pressed(KeyCode::ArrowDown) { -speed } else { 0. };
     r!(velocity_query.get_mut(*player2_id)).y = p2_speed;
+}
+
+fn update_score(
+    score_board_query: Single<&mut Text, With<ScoreBoard>>,
+    score_resource: Res<Score>,
+) {
+    let mut score_board = score_board_query;
+    let updated = format!("{} - {}", score_resource.player1, score_resource.player2);
+    score_board.0 = updated;
 }
 
 // fn contain_ball(
